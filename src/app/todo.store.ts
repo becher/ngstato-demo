@@ -1,97 +1,102 @@
-import { Injectable, OnDestroy } from '@angular/core'
-import { createStore, connectDevTools } from '@ngstato/core'
+import { createStore, optimistic, connectDevTools, devTools } from '@ngstato/core'
+import { StatoStore } from '@ngstato/angular'
 
-export type Todo = {
-  id: string
+// ─── INTERFACE ────────────────────────────────────────
+
+export interface Todo {
+  id:   number
   text: string
   done: boolean
 }
 
-type TodoCreate = {
-  text: string
-}
+// ─── STORE ────────────────────────────────────────────
 
-function uid(): string {
-  // Simple ID generator for demo purposes.
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-function createTodoCoreStore() {
+function createTodoStore() {
   const store = createStore({
-    // State
-    todos: [] as Todo[],
+    // ── State ──
+    todos:   [] as Todo[],
     loading: false,
+    filter:  'all' as 'all' | 'active' | 'completed',
 
-    // Computed
+    // ── Computed (memoized) ──
     computed: {
-      total: (state: any) => state.todos.length,
-      completed: (state: any) =>
-        state.todos.filter((t: Todo) => t.done).length,
-      remaining: (state: any) =>
-        state.todos.filter((t: Todo) => !t.done).length
+      total:     (s: any) => s.todos.length,
+      remaining: (s: any) => s.todos.filter((t: Todo) => !t.done).length,
+      completed: (s: any) => s.todos.filter((t: Todo) =>  t.done).length,
+
+      filteredTodos: (s: any) => {
+        switch (s.filter) {
+          case 'active':    return s.todos.filter((t: Todo) => !t.done)
+          case 'completed': return s.todos.filter((t: Todo) =>  t.done)
+          default:          return s.todos
+        }
+      }
     },
 
-    // Actions
+    // ── Actions ──
     actions: {
-      async addTodo(state: any, input: TodoCreate) {
-        const text = input.text.trim()
-        if (!text) return
-
+      async loadTodos(state: any) {
         state.loading = true
-
-        // No backend in this demo: update locally.
+        await new Promise(r => setTimeout(r, 600))
         state.todos = [
-          ...state.todos,
-          { id: uid(), text, done: false } satisfies Todo
+          { id: 1, text: '✅ Learn ngStato — async/await state management', done: true },
+          { id: 2, text: '🔄 Replace NgRx — 12x smaller, same features',    done: false },
+          { id: 3, text: '📦 Publish to npm — v0.4.0 with time-travel',      done: false },
+          { id: 4, text: '⚡ Add concurrency helpers — exclusive, queued',   done: false },
+          { id: 5, text: '🧪 Write tests with createMockStore()',            done: false },
         ]
-
         state.loading = false
       },
 
-      toggleTodo(state: any, id: string) {
+      addTodo(state: any, text: string) {
+        if (!text.trim()) return
+        state.todos = [...state.todos, {
+          id:   Date.now(),
+          text: text.trim(),
+          done: false
+        }]
+      },
+
+      toggleTodo(state: any, id: number) {
         state.todos = state.todos.map((t: Todo) =>
           t.id === id ? { ...t, done: !t.done } : t
         )
       },
 
-      deleteTodo(state: any, id: string) {
-        state.todos = state.todos.filter((t: Todo) => t.id !== id)
+      // Optimistic delete — instant UI update, rollback on failure
+      deleteTodo: optimistic(
+        (state: any, id: number) => {
+          state.todos = state.todos.filter((t: Todo) => t.id !== id)
+        },
+        async (_: any, id: number) => {
+          await new Promise(r => setTimeout(r, 300))
+          // In production: await http.delete(`/todos/${id}`)
+        }
+      ),
+
+      setFilter(state: any, filter: 'all' | 'active' | 'completed') {
+        state.filter = filter
+      },
+
+      clearCompleted(state: any) {
+        state.todos = state.todos.filter((t: Todo) => !t.done)
+      }
+    },
+
+    // ── Hooks ──
+    hooks: {
+      onActionDone: (name: string, ms: number) => {
+        console.log(`[TodoStore] ${name} — ${ms}ms`)
       }
     }
   })
 
+  // DevTools with time-travel 🕹️
   connectDevTools(store, 'TodoStore')
   return store
 }
 
-@Injectable({ providedIn: 'root' })
-export class TodoStore implements OnDestroy {
-  // Keep the core store instance private and expose signals-like getters.
-  private _store = createTodoCoreStore()
+// ─── ANGULAR SERVICE ──────────────────────────────────
+// StatoStore() auto-creates an Injectable with Signals
 
-  get todos() {
-    return this._store.todos as Todo[]
-  }
-  get loading() {
-    return this._store.loading as boolean
-  }
-
-  get total() {
-    return this._store.total as number
-  }
-  get completed() {
-    return this._store.completed as number
-  }
-  get remaining() {
-    return this._store.remaining as number
-  }
-
-  addTodo = (...args: any[]) => this._store.addTodo(...args)
-  toggleTodo = (...args: any[]) => this._store.toggleTodo(...args)
-  deleteTodo = (...args: any[]) => this._store.deleteTodo(...args)
-
-  ngOnDestroy() {
-    this._store.__store__.destroy(this._store)
-  }
-}
-
+export const TodoStore = StatoStore(() => createTodoStore())

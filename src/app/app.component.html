@@ -2,36 +2,57 @@
 
   <header>
     <h1>📝 ngStato — Todo Demo</h1>
-    <p>State management Angular sans RxJS</p>
+    <p>v0.4.0 — State-first, RxJS-free, with built-in time-travel DevTools</p>
   </header>
 
   <!-- Stats -->
   <div class="stats">
-    <span class="badge blue">Total : {{ store.total }}</span>
-    <span class="badge green">Faites : {{ store.completed }}</span>
-    <span class="badge orange">Restantes : {{ store.remaining }}</span>
+    <span class="badge blue">Total: {{ store.total }}</span>
+    <span class="badge green">Done: {{ store.completed }}</span>
+    <span class="badge orange">Left: {{ store.remaining }}</span>
   </div>
 
-  <!-- Formulaire -->
+  <!-- Form -->
   <div class="form">
     <input
       [(ngModel)]="newTodo"
-      placeholder="Nouvelle tâche..."
+      placeholder="What needs to be done?"
       (keyup.enter)="onAdd()"
     />
     <button (click)="onAdd()" [disabled]="!newTodo.trim()">
-      Ajouter
+      Add
     </button>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <button [class.active]="store.filter === 'all'" (click)="store.setFilter('all')">
+      All
+    </button>
+    <button [class.active]="store.filter === 'active'" (click)="store.setFilter('active')">
+      Active
+    </button>
+    <button [class.active]="store.filter === 'completed'" (click)="store.setFilter('completed')">
+      Completed
+    </button>
+    @if (store.completed > 0) {
+      <button class="clear" (click)="store.clearCompleted()">
+        Clear completed
+      </button>
+    }
   </div>
 
   <!-- Loading -->
   @if (store.loading) {
-    <div class="loading">Chargement...</div>
+    <div class="loading">
+      <div class="spinner"></div>
+      Loading...
+    </div>
   }
 
-  <!-- Liste -->
+  <!-- List -->
   <ul>
-    @for (todo of store.todos; track todo.id) {
+    @for (todo of store.filteredTodos; track todo.id) {
       <li [class.done]="todo.done">
         <input
           type="checkbox"
@@ -39,16 +60,29 @@
           (change)="store.toggleTodo(todo.id)"
         />
         <span>{{ todo.text }}</span>
-        <button (click)="store.deleteTodo(todo.id)">✕</button>
+        <button class="delete" (click)="store.deleteTodo(todo.id)">✕</button>
       </li>
     } @empty {
-      <li class="empty">Aucune tâche — ajoutez-en une !</li>
+      <li class="empty">No tasks — add one above!</li>
     }
   </ul>
 
+  <!-- Features showcase -->
+  <div class="features">
+    <h3>🚀 v0.4.0 Features in this demo</h3>
+    <div class="feature-grid">
+      <div class="feature">⚡ <strong>async/await</strong> actions</div>
+      <div class="feature">🔄 <strong>optimistic()</strong> delete with rollback</div>
+      <div class="feature">📊 <strong>Memoized</strong> computed selectors</div>
+      <div class="feature">🕹️ <strong>Time-travel</strong> DevTools below</div>
+      <div class="feature">🏷️ <strong>Filter</strong> by state</div>
+      <div class="feature">📦 <strong>~3 KB</strong> gzip total</div>
+    </div>
+  </div>
+
   <p class="hint">
-    🛠 Ouvrez les DevTools ngStato en bas à gauche
+    🛠️ Open the ngStato DevTools panel below — try undo/redo after adding tasks!
   </p>
 
 </div>
- <ngstato-devtools />
+<ngstato-devtools />
